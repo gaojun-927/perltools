@@ -1,0 +1,187 @@
+use Tk;
+use strict;
+my @rule=( #gainx,gainy,rotate(0-360),offx,offy
+#first is start, only use offx,offy as rect x,y
+	[1,  1, 0, 10 ,70],
+	[0.2,0.9,0,2,93],
+	[0.6,0.7,35,-33,73],
+	[0.6,0.6,-35,29,10],
+	[0.8,1,-51,59,5],
+	[0.5,0.9,37,-33,-15],
+	);
+my $maxx=1024;
+my $maxy=768;
+my $colorthred=10;
+my $firstcolor='black';
+my $secondcolor='green';
+my $ptnum=5000;
+my $ptdepth=5;
+my $mw=MainWindow->new(-title=>'MaoMao');
+my ($ind,$scalex,$scaley,$theta,$deltax,$deltay);
+$ind=0;$scalex=$rule[0]->[0];$scaley=$rule[0]->[1];$theta=$rule[0]->[2];$deltax=$rule[0]->[3];$deltay=$rule[0]->[4];
+my $newcanvas=$mw->Canvas(-height=>$maxy,-width=>$maxx,-background=>'white')->pack(-anchor=>'s',-side=>'left');	
+my $frame1=$mw->Frame(-borderwidth=>2,-relief=>'raised')->pack();
+my $spin=$frame1->Spinbox(-from=>0,-to=>scalar(@rule)-1,-command=>sub{load();design();},-increment=>1,-textvariable=>\$ind)->pack(-anchor=>'n',-side=>'top');
+$frame1->Scale(-from=>0.1,-to=>10,-label=>'scalex',-bigincrement=>0.1,-resolution=>0.1,-variable=>\$scalex,-command=>\&modify,-orient=>'horizontal',-width=>10 )
+	->pack(-anchor=>'n',-side=>'top',);
+$frame1->Scale(-from=>0.1,-to=>10,-label=>'scaley',-bigincrement=>0.1,-resolution=>0.1,-variable=>\$scaley,-command=>\&modify,-orient=>'horizontal',-width=>10 )
+	->pack(-anchor=>'n',-side=>'top');
+$frame1->Scale(-from=>-360,-to=>360,-label=>'Angle',-bigincrement=>1,-resolution=>1,-variable=>\$theta,-command=>\&modify,-orient=>'horizontal' ,-width=>10)
+	->pack(-anchor=>'n',-side=>'top');
+$frame1->Scale(-from=>-$maxx/2,-to=>$maxx/2,-label=>'deltax',-bigincrement=>1,,-resolution=>1,-variable=>\$deltax,-command=> \&modify,-orient=>'horizontal',-width=>10 )
+	->pack(-anchor=>'n',-side=>'top');
+$frame1->Scale(-from=>-$maxy/2,-to=>$maxy/2,-label=>'deltay',-bigincrement=>1,-resolution=>1,-variable=>\$deltay,-command=> \&modify,-orient=>'horizontal',-width=>10)
+	->pack(-anchor=>'n',-side=>'top');
+my $frame2=$mw->Frame(-borderwidth=>2,-relief=>'raised')->pack();
+$frame2->Scale(-from=>1,-to=>10000,-label=>'num',-bigincrement=>100,-resolution=>10,-variable=>\$ptnum,-orient=>'horizontal',-width=>10 )
+	->pack(-anchor=>'n',-side=>'top',);
+$frame2->Scale(-from=>1,-to=>10,-label=>'depth',-bigincrement=>1,-resolution=>1,-variable=>\$ptdepth,-orient=>'horizontal',-width=>10 )
+	->pack(-anchor=>'n',-side=>'top',);
+$mw->Button(-text =>'Draw',
+						-command=> sub{draw($mw)} 
+						)->pack(-anchor=>'n',-side=>'left');
+$mw->Button(-text =>'load',
+						-command=> sub{my $filename=$mw->getOpenFile();loadfromfile($filename);} 
+						)->pack(-anchor=>'n',-side=>'left');		
+$mw->Button(-text =>'save',
+						-command=> sub{my $filename=$mw->getSaveFile();print $filename;savetofile($filename);} 
+						)->pack(-anchor=>'n',-side=>'left');				
+MainLoop;
+
+sub save{
+	#save input to rule 
+	$rule[$ind]->[0]=$scalex;
+	$rule[$ind]->[1]=$scaley;
+	$rule[$ind]->[2]=$theta;
+	$rule[$ind]->[3]=$deltax;
+	$rule[$ind]->[4]=$deltay;
+}
+sub load{
+	#load rule to input
+	$scalex=$rule[$ind]->[0];
+	$scaley=$rule[$ind]->[1];
+	$theta=$rule[$ind]->[2];
+	$deltax=$rule[$ind]->[3];
+	$deltay=$rule[$ind]->[4];
+}
+sub modify{
+	save();
+	design();
+}
+	
+	
+sub design{
+	#draw rect according to new par
+	$newcanvas->delete('all');
+	my $x=$rule[0]->[3];
+	my $y=$rule[0]->[4];
+	my ($a,$a1)=xytrans($x,$y);
+	my ($b,$b1)=xytrans(-$x,-$y);
+	$newcanvas->createRectangle($a,$a1,$b,$b1,-outline=>'red');
+	for(my $i=1;$i<scalar(@rule);$i++){
+		my ($a,$a1)=xytrans(calxy($x,$y,$i));
+		my ($b,$b1)=xytrans(calxy($x,-$y,$i));
+		my ($c,$c1)=xytrans(calxy(-$x,-$y,$i));
+		my ($d,$d1)=xytrans(calxy(-$x,$y,$i));
+		if($i==$ind){
+			$newcanvas->createPolygon($a,$a1,$b,$b1,$c,$c1,$d,$d1,-fill=>undef,-outline=>'blue');
+		}else{
+			$newcanvas->createPolygon($a,$a1,$b,$b1,$c,$c1,$d,$d1,-fill=>undef,-outline=>'black');
+		}			
+	}
+}
+	
+sub draw{
+	#draw pixel
+	my ($mw)=@_;
+	my $canvas=$mw->Toplevel(-title=>'DianDian')->Canvas(-height=>$maxy,-width=>$maxx,-background=>'white');
+	$canvas->pack();
+	for(my $j=0;$j<$ptnum;$j++){
+		my ($ptx,$pty)=(  int(rand($rule[0]->[3]*2)-$rule[0]->[3]),
+											int(rand($rule[0]->[4]*2)-$rule[0]->[4]) ); #pick from base rect
+		my ($phyx,$phyy)=xytrans($ptx,$pty);									
+		$canvas->createRectangle($phyx,$phyy,$phyx,$phyy);
+		for(my $i=0;$i<$ptdepth;$i++){
+			my $rnd=int(rand(scalar(@rule)-1))+1; #start from 1
+			($ptx,$pty)=calxy($ptx,$pty,$rnd);
+			($phyx,$phyy)=xytrans($ptx,$pty);
+			if($i>$colorthred){
+				$canvas->createRectangle($phyx,$phyy,$phyx,$phyy,-outline=>$secondcolor);
+			}else{
+				$canvas->createRectangle($phyx,$phyy,$phyx,$phyy,-outline=>$firstcolor);
+			}
+		}
+	}
+
+}
+sub calxy{
+	#cal pt $oldx,$oldy to $newx,$newy use rule $ind
+	#all in math plan
+	my($oldx,$oldy,$ind)=@_;
+	my $gainx=$rule[$ind]->[0];
+	my $gainy=$rule[$ind]->[1];
+	my $angle=$rule[$ind]->[2]/360*2*3.14; #from 360 to 2pi
+	my $c=cos($angle);
+	my $s=sin($angle);
+	my $offsetx=$rule[$ind]->[3];
+	my $offsety=$rule[$ind]->[4];
+	my $newx=$c*$oldx*$gainx-$s*$oldy*$gainy+$offsetx;
+	my $newy=$s*$oldx*$gainx+$c*$oldy*$gainy+$offsety;
+	return ($newx,$newy);
+}
+sub xytrans{
+	#translate x,y from math plane to physics plane
+	# y direction is different
+	# 640*480
+	# 0,0 => 320, 240
+	my ($oldx,$oldy)=@_;
+	my $newx=$oldx+$maxx/2;
+	my $newy=-$oldy+$maxy/2;
+	return ($newx,$newy);
+}
+sub savetofile{
+	my $filename=$_[0];
+	open FH, "> $filename";
+	print FH "draw pl,$maxx,$maxy,$ptnum,$ptdepth,$firstcolor,$secondcolor,$colorthred \n";
+	foreach my $ttt(@rule){
+		print FH "$ttt->[0],$ttt->[1],$ttt->[2],$ttt->[3],$ttt->[4] \n";
+	}
+	close FH;
+}
+sub loadfromfile{
+	my $filename=$_[0];
+	if($filename eq ''){return;}
+	open FH, "$filename";
+	my $i=0;
+	my $head;
+	my ($tmaxx,$tmaxy,$tptnum,$tptdepth,$tfirstcolor,$tsecondcolor,$tcolorthred);
+	while(<FH>){
+		if($i==0){
+			 ($head,$tmaxx,$tmaxy,$tptnum,$tptdepth,$tfirstcolor,$tsecondcolor,$tcolorthred)=
+			  split(/,/,$_,8);
+			if($head eq 'draw pl'){
+			 	($maxx,$maxy,$ptnum,$ptdepth,$firstcolor,$secondcolor,$colorthred)=
+			 	($tmaxx,$tmaxy,$tptnum,$tptdepth,$tfirstcolor,$tsecondcolor,$tcolorthred);
+			 	@rule=();
+			}else{
+				close FH;
+				return;
+			}
+		}else{
+			my @ttt;
+			($ttt[0],$ttt[1],$ttt[2],$ttt[3],$ttt[4])=split(/,/,$_,5);
+			$rule[$i-1]=\@ttt;
+		}
+		$i++;
+	}
+	close FH;
+	refresh();	
+}
+sub refresh{
+	#re config all program parameter
+	$spin->configure(-to=>scalar(@rule)-1);
+	$newcanvas->configure(-height=>$maxy,-width=>$maxx);
+	design();
+}
+	
+

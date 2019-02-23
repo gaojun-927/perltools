@@ -1,0 +1,47 @@
+use strict;
+use Tk;
+my $mw=MainWindow->new();
+my $intxt;
+my $intxt_win=$mw->Scrolled('Text',-scrollbars=>'on',-height=>10,-width=>40)->pack();
+my $t=$intxt_win->Contents();
+my $rule='l2c';
+my $frame=$mw->Frame()->pack();
+ foreach my $c (qw/l2c c2l cfirst/) {
+	$frame->Radiobutton(
+            -text     => $c,
+            -variable => \$rule,
+            -relief   => 'flat',
+            -value    => lc($c),
+            )->pack(-side=>'left');
+};
+
+my $outtxt_win=$mw->ROText(-height=>10,-width=>40 )->pack(-side=>'top');
+$intxt_win->bind('<Key>',sub{ $t=$intxt_win->Contents();$t=filter($t,$rule);$outtxt_win->Contents($t) } );
+MainLoop;
+sub filter{
+	my $input=shift;
+	my $rule=shift;
+	no strict;
+	return &{$rule}($input);
+	use strict;
+}
+sub c2l{
+	my $input=shift;
+	return lc($input);
+}
+sub l2c{
+	my $input=shift;
+	return uc($input);
+}
+sub cfirst{
+	my $input=shift;
+	$input=lc($input);
+	my @inputlist=split(/\b/,$input);
+	foreach my $tt(@inputlist){
+		$tt=ucfirst($tt);
+	}
+	return join('',@inputlist);
+}
+	
+	
+	
